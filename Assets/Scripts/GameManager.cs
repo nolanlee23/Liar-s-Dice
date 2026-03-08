@@ -8,12 +8,13 @@ public class GameManager : NetworkBehaviour
     public UIManager uiManager;
     private bool actionable;
 
-    public NetworkVariable<int> currentBidQuantity = new NetworkVariable<int>(0);
-    public NetworkVariable<int> currentBidFace = new NetworkVariable<int>(0);
-
-    public NetworkVariable<int> currentPlayerTurn = new NetworkVariable<int>(1);
     Player currentPlayer => currentPlayerTurn.Value == 0 ? player1 : player2;
 
+    public NetworkVariable<int> currentBidQuantity = new NetworkVariable<int>(0);
+    public NetworkVariable<int> currentBidFace = new NetworkVariable<int>(0);
+    public NetworkVariable<int> currentPlayerTurn = new NetworkVariable<int>(1);
+
+    // Initialize states for both host and remote client, determine local and remote player
     public override void OnNetworkSpawn()
     {
         player1 = new Player(0);
@@ -31,6 +32,8 @@ public class GameManager : NetworkBehaviour
         }
     }
 
+    // Accounts for the difference in connection time delay and state variables properly updating
+    //      by sending the request to the server instead of the client
     [Rpc(SendTo.Server, InvokePermission = RpcInvokePermission.Everyone)]
     void RequestServerRpc()
     {
@@ -40,7 +43,6 @@ public class GameManager : NetworkBehaviour
     void StartGame()
     {
         currentPlayerTurn.Value = Random.Range(0, 2);
-        
         StartRound();
     }
 
@@ -60,6 +62,7 @@ public class GameManager : NetworkBehaviour
         
     }
 
+    // Syncs local variables with the server's
     [ClientRpc]
     void SyncRoundClientRpc(int[] p1Dice, int[] p2Dice, int p1DiceCount, int p2DiceCount) 
     {
@@ -75,6 +78,7 @@ public class GameManager : NetworkBehaviour
         uiManager.HideRemoteDice();
     }
 
+    // Determine which player is the local vs remote based on if hosting or not
     void UpdateDiceUI() 
     {
         Player local = IsServer ? player1 : player2;
@@ -82,6 +86,7 @@ public class GameManager : NetworkBehaviour
         uiManager.UpdateDice(local, remote);
     }
 
+    // Rolls [remaining dice] times, sets local variable
     void RollDice(Player p)
     {
         for (int i = 0; i < p.dice.Length; i++)
@@ -93,11 +98,7 @@ public class GameManager : NetworkBehaviour
         }
     }
 
-    Player GetOtherPlayer(Player p)
-    {
-        return (p == player1) ? player2 : player1;
-    }
-
+    // Server-side function called when Place Bid is pressed, updates network variables
     [Rpc(SendTo.Server, InvokePermission = RpcInvokePermission.Everyone)]
     public void PlaceBidServerRpc(int quantity, int face)
     {
@@ -113,6 +114,7 @@ public class GameManager : NetworkBehaviour
         UpdateBidClientRpc(quantity, face, currentPlayerTurn.Value);
     }
 
+    // Updates all client's bid and turn indicators
     [ClientRpc]
     void UpdateBidClientRpc(int quantity, int face, int nextPlayerTurn) 
     {
@@ -120,6 +122,7 @@ public class GameManager : NetworkBehaviour
         uiManager.UpdateTurnIndicators(nextPlayerTurn == 0 ? player1 : player2);
     }
 
+    // Server-side function called when Liar! is pressed, determines outcome of round
     [Rpc(SendTo.Server, InvokePermission = RpcInvokePermission.Everyone)]
     public void ChallengeServerRpc()
     {
@@ -147,6 +150,7 @@ public class GameManager : NetworkBehaviour
         return count;
     }
 
+    // Decide whether game is over when out of dice or roll next round if not
     void RoundLost(Player p)
     {
         p.diceCount--;
@@ -163,6 +167,7 @@ public class GameManager : NetworkBehaviour
         }
     }
 
+    // Ends the game client-side and displays final game state
     [ClientRpc]
     void GameOverClientRpc(int winnerNumber) 
     {
@@ -172,6 +177,7 @@ public class GameManager : NetworkBehaviour
         uiManager.RevealRemoteDice();
     }
 
+    // Displays end-of-round state client-side
     [ClientRpc]
     void RoundLostClientRpc(int losingPlayerNumber) 
     {
@@ -181,6 +187,7 @@ public class GameManager : NetworkBehaviour
         uiManager.RevealRemoteDice();
     }
 
+    // Allows for a delay to see the results of a challenge
     IEnumerator WaitThen(float seconds, System.Action callback)
     {
         yield return new WaitForSeconds(seconds);
@@ -190,5 +197,10 @@ public class GameManager : NetworkBehaviour
     void SwitchTurns()
     {
         currentPlayerTurn.Value = GetOtherPlayer(currentPlayer).playerNumber;
+    }
+
+    Player GetOtherPlayer(Player p)
+    {
+        return (p == player1) ? player2 : player1;
     }
 }

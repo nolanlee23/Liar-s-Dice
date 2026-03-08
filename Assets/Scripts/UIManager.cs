@@ -39,7 +39,7 @@ public class UIManager : MonoBehaviour
 
     public void UpdateDice(Player local, Player remote) 
     {
-        // Display remaining dice as images, set lost dice to null
+        // Display remaining dice as images, set lost dice to Color.clear
         for (int i = 0; i < 5; i++) 
         {
             // Display player 1 dice
@@ -75,7 +75,7 @@ public class UIManager : MonoBehaviour
         localTurnIndicator.color = isLocalTurn ? Color.white : Color.clear;
         remoteTurnIndicator.color = isLocalTurn ? Color.clear : Color.white;
 
-        // Deactivate UI elements when it is not the client's turn
+        // Deactivate interactable UI elements when it is not the client's turn
         quantityInput.gameObject.SetActive(isLocalTurn);
         faceInput.gameObject.SetActive(isLocalTurn);
         challengeButton.gameObject.SetActive(isLocalTurn);
@@ -110,6 +110,8 @@ public class UIManager : MonoBehaviour
     public void OnHostPressed() 
     {
         Debug.Log("Host pressed");
+
+        // Manually force allowing external connections
         var transport = NetworkManager.Singleton.GetComponent<Unity.Netcode.Transports.UTP.UnityTransport>();
         transport.SetConnectionData("0.0.0.0", 7777, "0.0.0.0");
         NetworkManager.Singleton.StartHost();
@@ -130,6 +132,7 @@ public class UIManager : MonoBehaviour
     public void RevealRemoteDice() 
     {
         Player remote = gameManager.player1 == localPlayer ? gameManager.player2 : gameManager.player1;
+        
         for (int i = 0; i < 5; i++) 
         {
             if (remote.dice[i] != 0)
@@ -140,7 +143,9 @@ public class UIManager : MonoBehaviour
     public void HideRemoteDice() 
     {
         Player remote = gameManager.player1 == localPlayer ? gameManager.player2 : gameManager.player1;
-        for (int i = 0; i < 5; i++) {
+
+        for (int i = 0; i < 5; i++) 
+        {
             if (remote.dice[i] != 0)
                 remoteDiceImages[i].sprite = blackDie;
         }
