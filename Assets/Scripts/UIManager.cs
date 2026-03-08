@@ -110,6 +110,8 @@ public class UIManager : MonoBehaviour
     public void OnHostPressed() 
     {
         Debug.Log("Host pressed");
+        var transport = NetworkManager.Singleton.GetComponent<Unity.Netcode.Transports.UTP.UnityTransport>();
+        transport.SetConnectionData("0.0.0.0", 7777, "0.0.0.0");
         NetworkManager.Singleton.StartHost();
     }
 
