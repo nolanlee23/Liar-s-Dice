@@ -1,11 +1,14 @@
 using UnityEngine;
 using UnityEngine.UI;
 using UnityEngine.EventSystems;
+using Unity.Netcode;
 using TMPro;
 
 public class UIManager : MonoBehaviour
 {
     public GameManager gameManager;
+
+    private Player localPlayer;
 
     public TextMeshProUGUI currentBidText;
     public TextMeshProUGUI gameStateText;
@@ -14,6 +17,8 @@ public class UIManager : MonoBehaviour
     public TMP_InputField faceInput;
 
     public Button challengeButton;
+    public Button hostButton;
+    public Button joinButton;
 
     public Sprite[] dieFaces;
     public Image[] localDiceImages;
@@ -22,6 +27,11 @@ public class UIManager : MonoBehaviour
     public Image remoteTurnIndicator;
     public Image localLossIndicator;
     public Image remoteLossIndicator;
+
+    public void SetLocalPlayer(Player p) 
+    {
+        localPlayer = p;
+    }
 
     public void UpdateDice(Player local, Player remote) 
     {
@@ -53,10 +63,10 @@ public class UIManager : MonoBehaviour
         gameStateText.text = state;
     }
 
-    public void UpdateTurnIndicators(Player currentPlayer, Player local, Player remote) 
+    public void UpdateTurnIndicators(Player currentPlayer) 
     {
-        localTurnIndicator.color = currentPlayer == local ? Color.white : Color.clear;
-        remoteTurnIndicator.color = currentPlayer == remote ? Color.white : Color.clear;
+        localTurnIndicator.color = currentPlayer == localPlayer ? Color.white : Color.clear;
+        remoteTurnIndicator.color = currentPlayer != localPlayer ? Color.white : Color.clear;
     }
 
     public void SetGameStateColor(Color color) 
@@ -70,7 +80,7 @@ public class UIManager : MonoBehaviour
 
         int quantity = int.Parse(quantityInput.text);
         int face = int.Parse(faceInput.text);
-        gameManager.PlaceBid(quantity, face);
+        gameManager.PlaceBidServerRpc(quantity, face);
 
         quantityInput.text = "";
         faceInput.text = "";
@@ -79,7 +89,24 @@ public class UIManager : MonoBehaviour
     public void OnChallengePressed()
     {
         EventSystem.current.SetSelectedGameObject(null);
-        gameManager.Challenge();
+        gameManager.ChallengeServerRpc();
+    }
+
+    public void OnHostPressed() 
+    {
+        Debug.Log("Host pressed");
+        NetworkManager.Singleton.StartHost();
+    }
+
+    public void OnJoinPressed() 
+    {
+        Debug.Log("Join pressed");
+        NetworkManager.Singleton.StartClient();
+    }
+
+    public void ShowChallengeButton() 
+    {
+        challengeButton.gameObject.SetActive(true);
     }
 
     public void HideChallengeButton()
@@ -89,9 +116,7 @@ public class UIManager : MonoBehaviour
 
     public void SetLossIndicator(Player loser, bool show) 
     {
-        Image indicator = loser == gameManager.player1 ? localLossIndicator : remoteLossIndicator;
+        Image indicator = loser == localPlayer ? localLossIndicator : remoteLossIndicator;
         indicator.color = show ? Color.white : Color.clear;
     }
-
-
 }

@@ -1,45 +1,85 @@
 using UnityEngine;
+using Unity.Netcode;
 using System.Collections;
 
-public class GameManager : MonoBehaviour
+public class GameManager : NetworkBehaviour
 {
     public Player player1, player2;
-    public Player currentPlayer;
     public UIManager uiManager;
-
-    private int currentBidQuantity;
-    private int currentBidFace;
     private bool actionable;
-    
-    void Start()
-    {
-        player1 = new Player(1);
-        player2 = new Player(2);
 
-        currentPlayer = player2;
+    public NetworkVariable<int> currentBidQuantity = new NetworkVariable<int>(0);
+    public NetworkVariable<int> currentBidFace = new NetworkVariable<int>(0);
+
+    public NetworkVariable<int> currentPlayerTurn = new NetworkVariable<int>(1);
+    Player currentPlayer => currentPlayerTurn.Value == 0 ? player1 : player2;
+
+    public override void OnNetworkSpawn()
+    {
+        player1 = new Player(0);
+        player2 = new Player(1);
+
+        if (IsServer)
+        {
+            StartGame();
+            uiManager.SetLocalPlayer(player1);
+        }
+        else
+        {
+            RequestServerRpc();
+            uiManager.SetLocalPlayer(player2);
+        }
+    }
+
+    [Rpc(SendTo.Server, InvokePermission = RpcInvokePermission.Everyone)]
+    void RequestServerRpc()
+    {
+        SyncRoundClientRpc(player1.dice, player2.dice, player1.diceCount, player2.diceCount);
+    }
+
+    void StartGame()
+    {
+        currentPlayerTurn.Value = Random.Range(0, 2);
         
         StartRound();
     }
 
     void StartRound()
     {
-        currentBidQuantity = 0;
-        currentBidFace = 0;
+        if (!IsServer) return;
+
+        currentBidQuantity.Value = 0;
+        currentBidFace.Value = 0;
 
         RollDice(player1);
         RollDice(player2);
-        SwitchTurns();
-
-        uiManager.SetGameStateColor(Color.white);
-        uiManager.UpdateDice(player1, player2);
-        uiManager.HideChallengeButton();
-        uiManager.UpdateTurnIndicators(currentPlayer, player1, player2);
-        uiManager.SetLossIndicator(player1, false);
-        uiManager.SetLossIndicator(player2, false);
-
 
         actionable = true;
+
+        SyncRoundClientRpc(player1.dice, player2.dice, player1.diceCount, player2.diceCount);
         
+    }
+
+    [ClientRpc]
+    void SyncRoundClientRpc(int[] p1Dice, int[] p2Dice, int p1DiceCount, int p2DiceCount) 
+    {
+        player1.dice = p1Dice;
+        player2.dice = p2Dice;
+        player1.diceCount = p1DiceCount;
+        player2.diceCount = p2DiceCount;
+        UpdateDiceUI();
+        uiManager.SetGameStateColor(Color.white);
+        uiManager.HideChallengeButton();
+        uiManager.UpdateTurnIndicators(currentPlayer);
+        uiManager.SetLossIndicator(player1, false);
+        uiManager.SetLossIndicator(player2, false);
+    }
+
+    void UpdateDiceUI() 
+    {
+        Player local = IsServer ? player1 : player2;
+        Player remote = IsServer ? player2 : player1;
+        uiManager.UpdateDice(local, remote);
     }
 
     void RollDice(Player p)
@@ -58,34 +98,39 @@ public class GameManager : MonoBehaviour
         return (p == player1) ? player2 : player1;
     }
 
-    public void PlaceBid(int quantity, int face)
+    [Rpc(SendTo.Server, InvokePermission = RpcInvokePermission.Everyone)]
+    public void PlaceBidServerRpc(int quantity, int face)
     {
         if (!actionable) return;
 
         // Check for bid validity
-        if (quantity <= currentBidQuantity && face <= currentBidFace)
-        {
-            uiManager.UpdateGameState("Invalid Bid; must be higher face value or quantity");
-            return;
-        }
+        if (quantity <= currentBidQuantity.Value && face <= currentBidFace.Value) return;
 
-        currentBidQuantity = quantity;
-        currentBidFace = face;
-        uiManager.UpdateBid(quantity, face);
+        currentBidQuantity.Value = quantity;
+        currentBidFace.Value = face;
 
         SwitchTurns();
+        UpdateBidClientRpc(quantity, face, currentPlayerTurn.Value);
     }
 
-    public void Challenge()
+    [ClientRpc]
+    void UpdateBidClientRpc(int quantity, int face, int nextPlayerTurn) 
+    {
+        uiManager.UpdateBid(quantity, face);
+        uiManager.UpdateTurnIndicators(nextPlayerTurn == 0 ? player1 : player2);
+        uiManager.ShowChallengeButton();
+    }
+
+    [Rpc(SendTo.Server, InvokePermission = RpcInvokePermission.Everyone)]
+    public void ChallengeServerRpc()
     {
         if (!actionable) return;
 
-        int totalFaceCount = CountTotalFaces(currentBidFace);
-        if (totalFaceCount >= currentBidQuantity)
+        int totalFaceCount = CountTotalFaces(currentBidFace.Value);
+        if (totalFaceCount >= currentBidQuantity.Value)
         {
             // Challenge failed; current player loses round
             RoundLost(currentPlayer);
-
         }
         else
         {
@@ -110,18 +155,29 @@ public class GameManager : MonoBehaviour
 
         if (p.diceCount <= 0)
         {
-            uiManager.UpdateGameState("Player " + GetOtherPlayer(p).playerNumber + " wins!");
-            uiManager.UpdateDice(player1, player2);
-            uiManager.HideChallengeButton();
-            
+            GameOverClientRpc(GetOtherPlayer(p).playerNumber);
         }
         else
         {
-            uiManager.SetGameStateColor(Color.red);
-            uiManager.SetLossIndicator(p, true);
+            RoundLostClientRpc(p.playerNumber);
             StartCoroutine(WaitThen(4f, StartRound));
-
         }
+    }
+
+    [ClientRpc]
+    void GameOverClientRpc(int winnerNumber) 
+    {
+        uiManager.UpdateGameState("Player " + winnerNumber + " wins!");
+        UpdateDiceUI();
+        uiManager.HideChallengeButton();
+    }
+
+    [ClientRpc]
+    void RoundLostClientRpc(int losingPlayerNumber) 
+    {
+        Player loser = losingPlayerNumber == 0 ? player1 : player2;
+        uiManager.SetGameStateColor(Color.red);
+        uiManager.SetLossIndicator(loser, true);
     }
 
     IEnumerator WaitThen(float seconds, System.Action callback)
@@ -132,7 +188,6 @@ public class GameManager : MonoBehaviour
 
     void SwitchTurns()
     {
-        currentPlayer = GetOtherPlayer(currentPlayer);
-        uiManager.UpdateTurnIndicators(currentPlayer, player1, player2);
+        currentPlayerTurn.Value = GetOtherPlayer(currentPlayer).playerNumber;
     }
 }
