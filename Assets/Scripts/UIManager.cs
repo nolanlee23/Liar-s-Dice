@@ -12,14 +12,18 @@ public class UIManager : MonoBehaviour
 
     public TextMeshProUGUI currentBidText;
     public TextMeshProUGUI gameStateText;
+    public TextMeshProUGUI displayX;
+    public TextMeshProUGUI displayS;
 
     public TMP_InputField quantityInput;
     public TMP_InputField faceInput;
 
     public Button challengeButton;
+    public Button placeBidButton;
     public Button hostButton;
     public Button joinButton;
 
+    public Sprite blackDie;
     public Sprite[] dieFaces;
     public Image[] localDiceImages;
     public Image[] remoteDiceImages;
@@ -65,8 +69,19 @@ public class UIManager : MonoBehaviour
 
     public void UpdateTurnIndicators(Player currentPlayer) 
     {
-        localTurnIndicator.color = currentPlayer == localPlayer ? Color.white : Color.clear;
-        remoteTurnIndicator.color = currentPlayer != localPlayer ? Color.white : Color.clear;
+        if (localPlayer == null) return;
+        bool isLocalTurn = currentPlayer == localPlayer;
+
+        localTurnIndicator.color = isLocalTurn ? Color.white : Color.clear;
+        remoteTurnIndicator.color = isLocalTurn ? Color.clear : Color.white;
+
+        // Deactivate UI elements when it is not the client's turn
+        quantityInput.gameObject.SetActive(isLocalTurn);
+        faceInput.gameObject.SetActive(isLocalTurn);
+        challengeButton.gameObject.SetActive(isLocalTurn);
+        placeBidButton.gameObject.SetActive(isLocalTurn);
+        displayX.gameObject.SetActive(isLocalTurn);
+        displayS.gameObject.SetActive(isLocalTurn);
     }
 
     public void SetGameStateColor(Color color) 
@@ -104,19 +119,28 @@ public class UIManager : MonoBehaviour
         NetworkManager.Singleton.StartClient();
     }
 
-    public void ShowChallengeButton() 
-    {
-        challengeButton.gameObject.SetActive(true);
-    }
-
-    public void HideChallengeButton()
-    {
-        challengeButton.gameObject.SetActive(false);
-    }
-
     public void SetLossIndicator(Player loser, bool show) 
     {
         Image indicator = loser == localPlayer ? localLossIndicator : remoteLossIndicator;
         indicator.color = show ? Color.white : Color.clear;
+    }
+
+    public void RevealRemoteDice() 
+    {
+        Player remote = gameManager.player1 == localPlayer ? gameManager.player2 : gameManager.player1;
+        for (int i = 0; i < 5; i++) 
+        {
+            if (remote.dice[i] != 0)
+                remoteDiceImages[i].sprite = dieFaces[remote.dice[i] - 1];
+        }
+    }
+
+    public void HideRemoteDice() 
+    {
+        Player remote = gameManager.player1 == localPlayer ? gameManager.player2 : gameManager.player1;
+        for (int i = 0; i < 5; i++) {
+            if (remote.dice[i] != 0)
+                remoteDiceImages[i].sprite = blackDie;
+        }
     }
 }

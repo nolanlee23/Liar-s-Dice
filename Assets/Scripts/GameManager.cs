@@ -21,13 +21,13 @@ public class GameManager : NetworkBehaviour
 
         if (IsServer)
         {
-            StartGame();
             uiManager.SetLocalPlayer(player1);
+            StartGame();
         }
         else
         {
-            RequestServerRpc();
             uiManager.SetLocalPlayer(player2);
+            RequestServerRpc();
         }
     }
 
@@ -69,10 +69,10 @@ public class GameManager : NetworkBehaviour
         player2.diceCount = p2DiceCount;
         UpdateDiceUI();
         uiManager.SetGameStateColor(Color.white);
-        uiManager.HideChallengeButton();
         uiManager.UpdateTurnIndicators(currentPlayer);
         uiManager.SetLossIndicator(player1, false);
         uiManager.SetLossIndicator(player2, false);
+        uiManager.HideRemoteDice();
     }
 
     void UpdateDiceUI() 
@@ -118,7 +118,6 @@ public class GameManager : NetworkBehaviour
     {
         uiManager.UpdateBid(quantity, face);
         uiManager.UpdateTurnIndicators(nextPlayerTurn == 0 ? player1 : player2);
-        uiManager.ShowChallengeButton();
     }
 
     [Rpc(SendTo.Server, InvokePermission = RpcInvokePermission.Everyone)]
@@ -167,9 +166,10 @@ public class GameManager : NetworkBehaviour
     [ClientRpc]
     void GameOverClientRpc(int winnerNumber) 
     {
-        uiManager.UpdateGameState("Player " + winnerNumber + " wins!");
+        uiManager.UpdateGameState("Player " + (winnerNumber + 1) + " wins!");
+        actionable = false;
         UpdateDiceUI();
-        uiManager.HideChallengeButton();
+        uiManager.RevealRemoteDice();
     }
 
     [ClientRpc]
@@ -178,6 +178,7 @@ public class GameManager : NetworkBehaviour
         Player loser = losingPlayerNumber == 0 ? player1 : player2;
         uiManager.SetGameStateColor(Color.red);
         uiManager.SetLossIndicator(loser, true);
+        uiManager.RevealRemoteDice();
     }
 
     IEnumerator WaitThen(float seconds, System.Action callback)

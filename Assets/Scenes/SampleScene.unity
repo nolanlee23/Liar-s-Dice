@@ -3986,11 +3986,15 @@ MonoBehaviour:
   gameManager: {fileID: 564113252}
   currentBidText: {fileID: 929754494}
   gameStateText: {fileID: 1808967751}
+  displayX: {fileID: 876909177}
+  displayS: {fileID: 1086398282}
   quantityInput: {fileID: 1592921221}
   faceInput: {fileID: 580536006}
   challengeButton: {fileID: 320093750}
+  placeBidButton: {fileID: 1070602934}
   hostButton: {fileID: 103236348}
   joinButton: {fileID: 1123543048}
+  blackDie: {fileID: -6170914563415466380, guid: 76a69fede130f4ed8a0e856d7fe6ffa0, type: 3}
   dieFaces:
   - {fileID: -1162029201790036853, guid: c206cdf758e9846348a3d7b6645a01a6, type: 3}
   - {fileID: -8679895730479474053, guid: d32442f421c4144f1bbd09a8ec67a98a, type: 3}
